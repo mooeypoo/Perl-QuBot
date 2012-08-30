@@ -26,10 +26,10 @@ use WWW::Mechanize;
 
 my $www = WWW::Mechanize->new();
 
-my $configfile = read_file('config.yml');
-my $repliesfile = read_file('autoreplies.yml');
-my $userfile = read_file('users.yml');
-my $helpfile = read_file('help.yml');
+my $configfile = read_file('system/config.yml');
+my $repliesfile = read_file('db/autoreplies.yml');
+my $userfile = read_file('system/users.yml');
+my $helpfile = read_file('system/help.yml');
 my $config = Load $configfile;
 my $autoreplies = Load $repliesfile;
 my $users = Load $userfile;
@@ -378,7 +378,7 @@ sub bot_login {
     ##update users:
     $users->{$params->{username}}->{last_login} = time();
     $users->{$params->{username}}->{last_nick} = $nick;
-    save_yml($users,'users.yml');
+    save_yml($users,'users.yml','system');
     
     ##spit it out, bot:
     return output("Login successful.","privmsg","user");
@@ -427,7 +427,7 @@ sub bot_adduser {
     $users->{$params->{username}} = $udetails;
 
     ##resave the yml file, too:
-    save_yml($users,'users.yml');
+    save_yml($users,'users.yml','system');
 
     return output("User ".$params->{username}." added with access level ".$params->{access_level}.".", "privmsg", "user");
 
@@ -480,7 +480,7 @@ sub bot_edituser {
     }    
    
     ##resave the yml file:
-    save_yml($users,'users.yml');
+    save_yml($users,'users.yml','system');
 
     return output("User $username edited: ".split(", ",@ans), "privmsg", "user");
 
@@ -588,12 +588,22 @@ sub log_activity {
 sub save_yml {
 	my $ymlhash = shift || return;
 	my $ymlfilename = shift || return;
+        my $ymlfolder = shift || '';
 	
 	my $yaml = ();
 	
 	$yaml = Dump $ymlhash;  ## YAML
 	
-	write_file($ymlfilename, $yaml) if $yaml;
+        my $fullpath;
+        
+        if ($ymlfolder) {
+            $fullpath = $ymlfolder."/".$ymlfilename ;
+        } else {
+            $fullpath = $ymlfilename;
+        }
+        
+#	write_file($ymlfilename, $yaml) if $yaml;
+	write_file($fullpath, $yaml) if $yaml;
 }
 
 sub md5_pwd_compare {
