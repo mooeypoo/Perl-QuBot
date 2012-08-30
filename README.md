@@ -3,6 +3,9 @@
 Perl IRC Bot with Quotes Database by Moriel Schottlender.
 mooeypoo@gmail.com
 
+### This bot is still under development. It's not operational. ###
+It's a project I'm working on mainly to practice perl and produce a small useful IRC bot for quotes for channels I chat in. Be patient.
+
 
 
 
