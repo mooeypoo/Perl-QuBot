@@ -16,11 +16,11 @@ These are commands anyone in the channel can activate without the need for bot a
 (more coming up)
 * login [username] [password] - login to the bot (make sure you do this in private message)
 * currops - announces what operators and admins are currently logged into the bot
-
 ## Bot Operators ##
 Operators are allowed to change basic configuration for the bot and users.
 * adduser [username] [password] [access_level] [email(optional)] - adds a user to the bot
 * edituser [username] [pass:newpass] [username:newuser] [email:new@email.com] - changes details for an existing user
+* op [nickname] - op someone in the channel. Only works if the bot is op.
 
 ## Bot Administration ##
 Bot admin has access to core files. 
