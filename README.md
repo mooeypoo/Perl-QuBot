@@ -12,10 +12,16 @@ It's a project I'm working on mainly to practice perl and produce a small useful
 The bot is meant mainly as a quote bot; insert a bot into the database and spit out a random one on request. However, there are several extra commands for administration and channel moderation purposes.
 ## General Commands ##
 These are commands anyone in the channel can activate without the need for bot access.
-* slap [nickname] - 'slap' someone on the channel.
-(more coming up)
 * login [username] [password] - login to the bot (make sure you do this in private message)
 * currops - announces what operators and admins are currently logged into the bot
+* slap [nickname] - 'slap' someone on the channel.
+(more coming up)
+
+## Quote Commands ##
+* quote ([id]) - display a quote. If given ID number, it will display that specific quote. Otherwise, it will display a random quote.
+* addquote [text] - adds a quote to the database. Can only be done by users with "Contributor" level.
+* delquote [id] - deletes a quote from the database. Can only be done by users with "Bot Operator" level.
+
 
 ## Bot Operators ##
 Operators are allowed to change basic configuration for the bot and users.

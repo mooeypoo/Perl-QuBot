@@ -553,15 +553,22 @@ sub bot_addquote {
     ## Check auth:
     return output("Unauthorized request.") unless (check_auth($hostname, AUTH_CONTRIBUTOR));
 
+    my $counter;
     ##add to quotes:
-    my $counter = scalar(keys $quotes) + 1;
+    if ($quotes) {
+        $counter = scalar(keys $quotes) + 1;
+    }else{
+        $counter = 1;
+    }
 
     ##verify counter doesn't already exist:
-    while ($quotes->{$counter}) {
+    while ($quotes->{$counter}->{text}) {
         $counter++;
     }
     
-    $quotes->{$counter} = $quote;
+    $quotes->{$counter}->{text} = $quote;
+    $quotes->{$counter}->{user} = $loggedin->{$hostname}->{username};
+    $quotes->{$counter}->{date} = time();
     
     ##save to yml:
     save_yml($quotes,'quotes.yml','db');
@@ -576,7 +583,7 @@ sub bot_quote {
     $quoteid = 0 unless looks_like_number($quoteid);
     
     if ($quoteid) { ## get specific quote
-        return output("[$quoteid] ".$quotes->{$quoteid}) if $quotes->{$quoteid};
+        return output("[$quoteid] ".$quotes->{$quoteid}->{text}) if $quotes->{$quoteid}->{text};
         ## if quote doesn't exist:
         return output("Can't find quote #$quoteid");
     }
@@ -585,7 +592,7 @@ sub bot_quote {
     my @keys = keys %{ $quotes };
     my $num = $keys[rand @keys];
     
-    return output("[$num] ".$quotes->{$num});
+    return output("[$num] ".$quotes->{$num}->{text});
 
 
 }
