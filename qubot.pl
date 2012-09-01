@@ -17,6 +17,7 @@ use File::Open qw(fopen fopen_nothrow fsysopen fsysopen_nothrow);
 use DateTime;
 use Text::ParseWords; 
 use Crypt::PasswdMD5;
+
 use Scalar::Util qw(looks_like_number);
 use Data::Dumper;
 
@@ -32,8 +33,9 @@ use constant {
 
 ##########################
 
-my $configfile = read_file('system/config.yml');
 my $repliesfile = read_file('db/autoreplies.yml');
+my $quotesfile = read_file('db/quotes.yml');
+my $configfile = read_file('system/config.yml');
 my $userfile = read_file('system/users.yml');
 my $helpfile = read_file('system/help.yml');
 
@@ -41,6 +43,7 @@ my $config = Load $configfile;
 my $autoreplies = Load $repliesfile;
 my $users = Load $userfile;
 my $bothelp = Load $helpfile;
+my $quotes = Load $quotesfile;
 
 my $triggers;
 for my $key (keys %{ $autoreplies }) {
@@ -65,6 +68,14 @@ my %commands = (
                 'edituser' => \&bot_edituser, ##edit user details
                 'login' => \&bot_login, ##log into the bot
                 'currops' => \&bot_ops, ##output list of loggedin users
+                ## QUOTES ##
+                'quote' => \&bot_quote, ##get quote (specific or random)
+                'addquote' => \&bot_addquote, ##add a quote to the db
+                'delquote' => \&bot_delquote, ##add a quote to the db
+
+                'q' => \&bot_quote, ##alias for 'quote'
+                'addq' => \&bot_addquote, ##alias for addquote
+                'delq' => \&bot_delquote, ##alias for delquote
                 ## CHAN ADMINISTRATION ##
                 'op' => \&bot_chan_op, ## op someoe on the channel
                 ## FUN / MISC ##
@@ -177,7 +188,7 @@ sub on_public {
 
         if ($cmdresult) {
             my $restarget = $channel;
-               $restarget = $cmdresult->{target} if ($cmdresult->{target} && $cmdresult->{target} ne 'chan');
+               $restarget = $cmdresult->{target} if (defined $cmdresult->{target} && $cmdresult->{target} ne 'chan');
                
             my $restype = 'privmsg';
                $restype = $cmdresult->{type} if $cmdresult->{type};
@@ -243,6 +254,7 @@ sub bot_refresh {
     
     $config = {};
     $autoreplies = {};
+    $quotes = {};
     $triggers = [];
     
     my $nick    = (split /!/, $hostmask)[0];
@@ -250,10 +262,14 @@ sub bot_refresh {
     ## Check auth:
     return output("Unauthorized request.","privmsg","user") unless (check_auth($hostname, AUTH_ADMIN));
 
-    my $cfile = read_file('config.yml');
-    my $rfile = read_file('autoreplies.yml');
+    my $cfile = read_file('system/config.yml');
+    my $ufile = read_file('system/users.yml');
+    my $rfile = read_file('db/autoreplies.yml');
+    my $qfile = read_file('db/quotes.yml');
+    $users = Load $ufile;
     $config = Load $cfile;
     $autoreplies = Load $rfile;
+    $quotes = Load $qfile;
     
     for my $key (keys %{ $autoreplies }) {
         push(@$triggers, $key);
@@ -265,6 +281,7 @@ sub bot_refresh {
     
 
 }
+
 
 sub bot_cmdprefix {
     my $hostmask = shift || return;
@@ -521,6 +538,84 @@ sub bot_edituser {
 }
 
 
+### QUOTE DB COMMANDS ###
+sub bot_addquote {
+    my $hostmask = shift || return;
+    
+    my $quote = join(" ",@_);
+    
+    return output("USE: ".$cmdchar."addquote [quote]") unless ($quote);
+
+    ## check auth:
+    my $nick    = (split /!/, $hostmask)[0];
+    my $hostname = (split /!/, $hostmask)[1];
+
+    ## Check auth:
+    return output("Unauthorized request.") unless (check_auth($hostname, AUTH_CONTRIBUTOR));
+
+    ##add to quotes:
+    my $counter = scalar(keys $quotes) + 1;
+
+    ##verify counter doesn't already exist:
+    while ($quotes->{$counter}) {
+        $counter++;
+    }
+    
+    $quotes->{$counter} = $quote;
+    
+    ##save to yml:
+    save_yml($quotes,'quotes.yml','db');
+    
+    return output("Quote #".$counter." saved.");
+
+}
+sub bot_quote {
+    my $hostmask = shift || return;
+    my $quoteid = shift || '';
+    
+    $quoteid = 0 unless looks_like_number($quoteid);
+    
+    if ($quoteid) { ## get specific quote
+        return output("[$quoteid] ".$quotes->{$quoteid}) if $quotes->{$quoteid};
+        ## if quote doesn't exist:
+        return output("Can't find quote #$quoteid");
+    }
+    
+    ##get random quote:
+    my @keys = keys %{ $quotes };
+    my $num = $keys[rand @keys];
+    
+    return output("[$num] ".$quotes->{$num});
+
+
+}
+sub bot_delquote {
+    my $hostmask = shift || return;
+    my $quoteid = shift || '';
+    
+    ## check auth:
+    my $nick    = (split /!/, $hostmask)[0];
+    my $hostname = (split /!/, $hostmask)[1];
+
+    ## Check auth:
+    return output("Unauthorized request.") unless (check_auth($hostname, AUTH_BOTOP));
+
+    ## if quoteid is bad:
+    return ("To do that, I need an actual quote ID.") unless looks_like_number($quoteid);
+    
+    ## if quote doesn't exist:
+    return output("Can't find quote #$quoteid") unless $quotes->{$quoteid};
+
+    ## delete quote:
+    delete $quotes->{$quoteid};
+    
+    ##save the yml again:
+    save_yml($quotes,'quotes.yml','db');
+    
+    return output("Quote #".$quoteid." deleted.");
+    
+}
+### GENERAL COMMANDS ####
 sub bot_slap {
     my $hostmask = shift || '';
     my $slapee = shift || '';
@@ -560,6 +655,8 @@ sub bot_chan_op {
         return output("I would've considered complying, if I had the power.", 'privmsg', 'chan');
     }
 }
+
+
 
 
 #############################
@@ -645,6 +742,7 @@ sub md5_pwd_compare {
 	return 0 unless $crypt_pwd eq unix_md5_crypt($plain_pwd, $crypt_pwd);
 	return 1;
 }
+
 
 # Run the bot until it is done.
 $poe_kernel->run();

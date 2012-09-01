@@ -2,10 +2,10 @@
 settings:
   channels:
     '#moo': ''
-  server: eris.blackcobalt.net
-  port: 6667
-  entrymsg: 
+  cmdprefix: .
+  entrymsg: ~
   ircname: qubot
   nick: qubot
+  port: 6667
+  server: eris.blackcobalt.net
   username: mooeybot
-  cmdprefix: "!"
