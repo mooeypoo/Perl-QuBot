@@ -15,6 +15,7 @@ use File::Slurp;
 use File::Open qw(fopen fopen_nothrow fsysopen fsysopen_nothrow);
 
 use DateTime;
+#use POSIX qw/strftime/;
 use Text::ParseWords; 
 use Crypt::PasswdMD5;
 
@@ -72,10 +73,12 @@ my %commands = (
                 'quote' => \&bot_quote, ##get quote (specific or random)
                 'addquote' => \&bot_addquote, ##add a quote to the db
                 'delquote' => \&bot_delquote, ##add a quote to the db
+                'infquote' => \&bot_infquote, ##add a quote to the db
 
                 'q' => \&bot_quote, ##alias for 'quote'
                 'addq' => \&bot_addquote, ##alias for addquote
                 'delq' => \&bot_delquote, ##alias for delquote
+                'infq' => \&bot_infquote, ##add a quote to the db
                 ## CHAN ADMINISTRATION ##
                 'op' => \&bot_chan_op, ## op someoe on the channel
                 ## FUN / MISC ##
@@ -588,10 +591,14 @@ sub bot_quote {
         return output("Can't find quote #$quoteid");
     }
     
+    
     ##get random quote:
     my @keys = keys %{ $quotes };
     my $num = $keys[rand @keys];
     
+    ##check if there are quotes at all:
+    return output("No quotes in the database.") unless (@keys);
+
     return output("[$num] ".$quotes->{$num}->{text});
 
 
@@ -622,6 +629,23 @@ sub bot_delquote {
     return output("Quote #".$quoteid." deleted.");
     
 }
+sub bot_infquote {
+    my $hostmask = shift || return;
+    my $quoteid = shift || '';
+    
+    return output("Must supply quote id.") unless $quoteid;
+    
+    $quoteid = 0 unless looks_like_number($quoteid);
+    
+    ## if quote doesn't exist:
+    return output("Can't find quote #$quoteid") unless ($quotes->{$quoteid}->{date});
+
+    ###my $dt = DateTime->from_epoch( $quotes->{$quoteid}->{date} );
+    my $fulldate = scalar gmtime $quotes->{$quoteid}->{date};
+    return output("Quote #$quoteid submitted by ".$quotes->{$quoteid}->{user}." on ".$fulldate) if $quotes->{$quoteid}->{text};
+    
+}
+
 ### GENERAL COMMANDS ####
 sub bot_slap {
     my $hostmask = shift || '';

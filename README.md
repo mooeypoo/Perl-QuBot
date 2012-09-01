@@ -21,7 +21,7 @@ These are commands anyone in the channel can activate without the need for bot a
 * quote ([id]) - display a quote. If given ID number, it will display that specific quote. Otherwise, it will display a random quote.
 * addquote [text] - adds a quote to the database. Can only be done by users with "Contributor" level.
 * delquote [id] - deletes a quote from the database. Can only be done by users with "Bot Operator" level.
-
+* infquote [id] - show more information about specific quote.
 
 ## Bot Operators ##
 Operators are allowed to change basic configuration for the bot and users.
