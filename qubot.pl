@@ -2,7 +2,6 @@
 
 use strict;
 use warnings FATAL => 'all';
-use Term::ANSIColor;
 use Term::ANSIColor qw(:constants);
 use YAML::XS;
 
@@ -22,14 +21,22 @@ use Scalar::Util qw(looks_like_number);
 use Data::Dumper;
 
 use Email::Valid;
-use WWW::Mechanize;
 
-my $www = WWW::Mechanize->new();
+### Defining constants ###
+use constant {
+    AUTH_ADMIN => 9999,
+    AUTH_BOTOP => 500,
+    AUTH_CONTRIBUTOR => 100,
+    AUTH_USER => 10,
+};
+
+##########################
 
 my $configfile = read_file('system/config.yml');
 my $repliesfile = read_file('db/autoreplies.yml');
 my $userfile = read_file('system/users.yml');
 my $helpfile = read_file('system/help.yml');
+
 my $config = Load $configfile;
 my $autoreplies = Load $repliesfile;
 my $users = Load $userfile;
@@ -39,8 +46,6 @@ my $triggers;
 for my $key (keys %{ $autoreplies }) {
     push(@$triggers, $key);
 }
-
-#print Dumper $bothelp;
 
 
 my $channels = $config->{settings}->{channels};
@@ -54,6 +59,7 @@ my $dns = POE::Component::Client::DNS->spawn();
 my %commands = (
                 'refresh' => \&bot_refresh, ##re-read configuration files
                 'help' => \&bot_help, ## help files
+                'cmdprefix' => \&bot_cmdprefix, ##change command char
                 ## BOT ADMINSTRATION ##
                 'adduser' => \&bot_adduser, ##add a user to the bot
                 'edituser' => \&bot_edituser, ##edit user details
@@ -242,7 +248,7 @@ sub bot_refresh {
     my $nick    = (split /!/, $hostmask)[0];
     my $hostname = (split /!/, $hostmask)[1];
     ## Check auth:
-    return output("Unauthorized request.","privmsg","user") unless (check_auth($hostname, 9000));
+    return output("Unauthorized request.","privmsg","user") unless (check_auth($hostname, AUTH_ADMIN));
 
     my $cfile = read_file('config.yml');
     my $rfile = read_file('autoreplies.yml');
@@ -258,6 +264,29 @@ sub bot_refresh {
     return $result;
     
 
+}
+
+sub bot_cmdprefix {
+    my $hostmask = shift || return;
+    my $newchar = shift || '';
+    
+    my $nick    = (split /!/, $hostmask)[0];
+    my $hostname = (split /!/, $hostmask)[1];
+
+    unless ($newchar) {
+        ##say what it is:
+        return output("Command prefix: [".$config->{settings}->{cmdprefix}."]", "privmsg");
+    }
+    
+    ## Check auth:
+    return output("Unauthorized request.","privmsg") unless (check_auth($hostname, AUTH_ADMIN));
+    
+    ##replace:
+    $config->{settings}->{cmdprefix} = $newchar;
+    $cmdchar = $newchar;
+    ##save the yml again:
+    save_yml($config,'config.yml','system');
+    return output("New command prefix: [$newchar]", "privmsg");
 }
 
 sub bot_help {
@@ -314,7 +343,7 @@ sub bot_ops {
     my $hostname = (split /!/, $params->{hostmask})[1];
 
     ## Check auth:
-    return output("Unauthorized request.","privmsg","user") unless (check_auth($hostname, 100));
+    return output("Unauthorized request.","privmsg","user") unless (check_auth($hostname, AUTH_CONTRIBUTOR));
         
     ##see who's "online" from logged in users:
     unless ($loggedin) {
@@ -405,7 +434,7 @@ sub bot_adduser {
     my $hostname = (split /!/, $params->{hostmask})[1];
 
     ## Check auth:
-    return output("Unauthorized request.","privmsg","user") unless (check_auth($hostname, 9000));
+    return output("Unauthorized request.","privmsg","user") unless (check_auth($hostname, AUTH_BOTOP));
 
     ## Make sure that the username doesn't already exist:
     if ($users->{$params->{username}}) {
@@ -416,8 +445,13 @@ sub bot_adduser {
     
     $udetails->{username} = $params->{username};
     $udetails->{pass} = unix_md5_crypt($params->{pass});
-    $udetails->{access_level} = 10;
-    $udetails->{access_level} = $params->{access_level} if looks_like_number($params->{access_level});
+    
+    if (looks_like_number($params->{access_level}) and check_auth($hostname, $params->{access_level})) {
+        $udetails->{access_level} = $params->{access_level};
+    } else {
+        $params->{access_level} = 10;
+    }
+    $udetails->{access_level} = $params->{access_level};
 
     $udetails->{hostname} = $hostname if ($hostname);
     $udetails->{email} = $params->{email} if (Email::Valid->address($params->{email}));
@@ -449,7 +483,7 @@ sub bot_edituser {
     }
 
     ## Check auth (editing user must be higher-level than edited user):
-    return output("You don't have enough authority for this.","privmsg","user") unless (check_auth($hostname, ($users->{$username}->{access_level}+10)));
+    return output("You don't have enough authority for this.","privmsg","user") unless (check_auth($hostname, ($users->{$username}->{access_level}+100)));
     
 
     ## go over params:
@@ -508,7 +542,7 @@ sub bot_chan_op {
     
     ##check auth:
     my $hostname = (split /!/, $hostmask)[1];
-    return output("Unauthorized request.","privmsg") unless (check_auth($hostname, 500));
+    return output("Unauthorized request.","privmsg") unless (check_auth($hostname, AUTH_BOTOP));
     
     my $mynick = $irc->nick_name();
     print $mynick;
@@ -602,7 +636,6 @@ sub save_yml {
             $fullpath = $ymlfilename;
         }
         
-#	write_file($ymlfilename, $yaml) if $yaml;
 	write_file($fullpath, $yaml) if $yaml;
 }
 
@@ -612,6 +645,7 @@ sub md5_pwd_compare {
 	return 0 unless $crypt_pwd eq unix_md5_crypt($plain_pwd, $crypt_pwd);
 	return 1;
 }
+
 # Run the bot until it is done.
 $poe_kernel->run();
 exit 0;
