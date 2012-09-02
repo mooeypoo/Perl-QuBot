@@ -3,10 +3,14 @@
 Perl IRC Bot with Quotes Database by Moriel Schottlender.
 mooeypoo@gmail.com
 
-### This bot is still under development. It's not operational. ###
-It's a project I'm working on mainly to practice perl and produce a small useful IRC bot for quotes for channels I chat in. Be patient.
+### This bot is now in testing. ###
 
+This is a project I've been working on to get my feet wet in perl.
+Feel free to use this bot for your personal uses, but please don't remove the credit.
+If you have ideas on how to improve this small bot, post them in the "issues" tab. If you find any bugs or malfunctions, please post them in the "issues".
 
+# Installation #
+This bot comes with a perl installer. Run the "qubot.pl" script, and it will automatically launch the installer for you.
 
 # Commands #
 The bot is meant mainly as a quote bot; insert a bot into the database and spit out a random one on request. However, there are several extra commands for administration and channel moderation purposes.
@@ -21,7 +25,8 @@ These are commands anyone in the channel can activate without the need for bot a
 * quote ([id]) - display a quote. If given ID number, it will display that specific quote. Otherwise, it will display a random quote.
 * addquote [text] - adds a quote to the database. Can only be done by users with "Contributor" level.
 * delquote [id] - deletes a quote from the database. Can only be done by users with "Bot Operator" level.
-* infquote [id] - show more information about specific quote.
+* infoquote [id] - show more information about specific quote.
+* vote [up|down] [quoteID] - increase or decrease the ratings of a quote.
 
 ## Bot Operators ##
 Operators are allowed to change basic configuration for the bot and users.
