@@ -16,7 +16,8 @@ use File::Open qw(fopen fopen_nothrow fsysopen fsysopen_nothrow);
 
 use DateTime;
 use Text::ParseWords; 
-use Crypt::PasswdMD5;
+#use Crypt::PasswdMD5;
+use Crypt::Passwd::XS;
 
 use Scalar::Util qw(looks_like_number);
 use Data::Dumper;
@@ -423,7 +424,7 @@ sub bot_login {
     }
     
     ##check if pass is right:
-    unless (md5_pwd_compare($params->{pass},$users->{$params->{username}}->{pass})) {
+    unless (pwd_compare($params->{pass},$users->{$params->{username}}->{pass})) {
         return output("Bad password.","privmsg","user");
     }
     
@@ -455,7 +456,7 @@ sub bot_adduser {
     
     for my $req (@required) {
         unless ($params->{$req}) {
-            return output("Missing parameter: $req.","privmsg","user");
+            return output("Missing parameter: $req.");
         }
     }
 
@@ -463,17 +464,20 @@ sub bot_adduser {
     my $hostname = (split /!/, $params->{hostmask})[1];
 
     ## Check auth:
-    return output("Unauthorized request.","privmsg","user") unless (check_auth($hostname, AUTH_BOTOP));
+    return output("Unauthorized request.") unless (check_auth($hostname, AUTH_BOTOP));
 
     ## Make sure that the username doesn't already exist:
     if ($users->{$params->{username}}) {
-        return output("Username already exists.","privmsg","user");
+        return output("Username already exists.");
     }
     
     my $udetails;
     
     $udetails->{username} = $params->{username};
-    $udetails->{pass} = unix_md5_crypt($params->{pass});
+    $udetails->{pass} = #unix_md5_crypt($params->{pass});
+
+    my $salt = create_salt();
+    $udetails->{pass} = Crypt::Passwd::XS::crypt($params->{pass}, $salt);
     
     if (looks_like_number($params->{access_level}) and check_auth($hostname, $params->{access_level})) {
         $udetails->{access_level} = $params->{access_level};
@@ -483,7 +487,7 @@ sub bot_adduser {
     $udetails->{access_level} = $params->{access_level};
 
     $udetails->{hostname} = $hostname if ($hostname);
-    $udetails->{email} = $params->{email} if (Email::Valid->address($params->{email}));
+    $udetails->{email} = $params->{email} if (defined $params->{email} && Email::Valid->address($params->{email}));
 
     ## Save $udetails into the users yml:
     
@@ -492,7 +496,7 @@ sub bot_adduser {
     ##resave the yml file, too:
     save_yml($users,'users.yml','system');
 
-    return output("User ".$params->{username}." added with access level ".$params->{access_level}.".", "privmsg", "user");
+    return output("User ".$params->{username}." added with access level ".$params->{access_level}.".");
 
 }
 
@@ -508,7 +512,7 @@ sub bot_edituser {
 
     ## Make sure that the username exists:
     unless ($users->{$username}) {
-        return output("Username doesn't exist.","privmsg","user");
+        return output("Username doesn't exist.");
     }
 
     ## Check auth (editing user must be higher-level than edited user):
@@ -545,7 +549,7 @@ sub bot_edituser {
     ##resave the yml file:
     save_yml($users,'users.yml','system');
 
-    return output("User $username edited: ".split(", ",@ans), "privmsg", "user");
+    return output("User $username edited: ".split(", ",@ans));
 
 }
 
@@ -808,11 +812,18 @@ sub save_yml {
 	write_file($fullpath, $yaml) if $yaml;
 }
 
-sub md5_pwd_compare {
+sub create_salt {
+    my @chars = ('a' .. 'z', 0 .. 9, '.', '/' );
+    my $salt = join '', map { $chars[rand @chars] } 1 .. 8;
+    return '$5$'.$salt.'$';
+}
+
+sub pwd_compare {
 	my $plain_pwd = shift || return;
 	my $crypt_pwd = shift || return;
-	return 0 unless $crypt_pwd eq unix_md5_crypt($plain_pwd, $crypt_pwd);
-	return 1;
+        
+        return 1 if $crypt_pwd eq Crypt::Passwd::XS::crypt($plain_pwd, $crypt_pwd);
+	return 0;
 }
 
 

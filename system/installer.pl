@@ -4,7 +4,8 @@ use File::Slurp;
 use File::Open qw(fopen fopen_nothrow fsysopen fsysopen_nothrow);
 use Data::Dumper;
 use YAML::XS;
-use Crypt::PasswdMD5;
+#use Crypt::PasswdMD5;
+use Crypt::Passwd::XS;
 
 my $config;
 
@@ -97,7 +98,13 @@ ADMINPASS:
 
     ## crypt:
     $users->{admin}->{username} = 'admin';
-    $users->{admin}->{pass} = unix_md5_crypt($admin_pass);
+#    $users->{admin}->{pass} = unix_md5_crypt($admin_pass);
+    
+    my @schars = ('a' .. 'z', 0 .. 9, '.', '/' );
+    my $salt = join '', map { $schars[rand @schars] } 1 .. 8;
+    $users->{admin}->{pass} = Crypt::Passwd::XS::crypt($admin_pass, '$5$'.$salt.'$');
+
+#    $users->{admin}->{pass} = unix_md5_crypt($admin_pass);
     $users->{admin}->{access_level} = 9999;
     my $useryaml = ();
     $useryaml = Dump $users;  ## YAML
