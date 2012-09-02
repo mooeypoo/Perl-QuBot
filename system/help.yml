@@ -19,7 +19,23 @@ op:
             access_level: change user's access level
     currops:
         desc: Show available (online) bot operators.
+    dellquote:
+        desc: deletes a quote.
+        syntax: delquote [quoteID]
+contrib:
+    addquote:
+        desc: Add a quote to the database.
+        syntax: addquote [text]
 general:
+    quote:
+        desc: Retrive a quote from the database. If ID is not given, retrieves a random quote.
+        syntax: quote ([quoteID])
+    infoquote:
+        desc: Show full info about a particular quote.
+        syntax: infoquote [quoteID]
+    voteq:
+        desc: Adds or decreases from a quote's rating.
+        syntax: voteq [up|down] [quoteID]
     help:
         desc: show available bot commands.
     slap:

@@ -15,7 +15,6 @@ use File::Slurp;
 use File::Open qw(fopen fopen_nothrow fsysopen fsysopen_nothrow);
 
 use DateTime;
-#use POSIX qw/strftime/;
 use Text::ParseWords; 
 use Crypt::PasswdMD5;
 
@@ -34,17 +33,26 @@ use constant {
 
 ##########################
 
-my $repliesfile = read_file('db/autoreplies.yml');
-my $quotesfile = read_file('db/quotes.yml');
-my $configfile = read_file('system/config.yml');
-my $userfile = read_file('system/users.yml');
-my $helpfile = read_file('system/help.yml');
+my $configfile = read_file('system/config.yml') if (-e 'system/config.yml');
+my $config = Load $configfile if ($configfile);
+unless ($config) {
+    system 'perl system/installer.pl';
+    my $cfile = read_file('system/config.yml') if (-e 'system/config.yml');
+    $config = Load $cfile if ($cfile);
+}
 
-my $config = Load $configfile;
-my $autoreplies = Load $repliesfile;
-my $users = Load $userfile;
-my $bothelp = Load $helpfile;
-my $quotes = Load $quotesfile;
+print Dumper $config;
+
+my $userfile = read_file('system/users.yml') if (-e 'system/users.yml');
+my $helpfile = read_file('system/help.yml') if (-e 'system/help.yml');
+my $repliesfile = read_file('db/autoreplies.yml') if (-e 'db/autoreplies.yml');
+my $quotesfile = read_file('db/quotes.yml') if (-e 'db/quotes.yml');
+
+
+my $autoreplies = Load $repliesfile if ($repliesfile);
+my $users = Load $userfile if ($userfile);
+my $bothelp = Load $helpfile if ($helpfile);
+my $quotes = Load $quotesfile if ($quotesfile);
 
 my $triggers;
 for my $key (keys %{ $autoreplies }) {
@@ -73,12 +81,13 @@ my %commands = (
                 'quote' => \&bot_quote, ##get quote (specific or random)
                 'addquote' => \&bot_addquote, ##add a quote to the db
                 'delquote' => \&bot_delquote, ##add a quote to the db
-                'infquote' => \&bot_infquote, ##add a quote to the db
+                'infoquote' => \&bot_infquote, ##add a quote to the db
 
-                'q' => \&bot_quote, ##alias for 'quote'
-                'addq' => \&bot_addquote, ##alias for addquote
-                'delq' => \&bot_delquote, ##alias for delquote
-                'infq' => \&bot_infquote, ##add a quote to the db
+                    'q' => \&bot_quote, ##alias for 'quote'
+                    'addq' => \&bot_addquote, ##alias for addquote
+                    'delq' => \&bot_delquote, ##alias for delquote
+                    'infoq' => \&bot_infquote, ##add a quote to the db
+                    'voteq' => \&bot_votequote, ##vote a quote up or down
                 ## CHAN ADMINISTRATION ##
                 'op' => \&bot_chan_op, ## op someoe on the channel
                 ## FUN / MISC ##
@@ -572,6 +581,7 @@ sub bot_addquote {
     $quotes->{$counter}->{text} = $quote;
     $quotes->{$counter}->{user} = $loggedin->{$hostname}->{username};
     $quotes->{$counter}->{date} = time();
+    $quotes->{$counter}->{rating} = 0;
     
     ##save to yml:
     save_yml($quotes,'quotes.yml','db');
@@ -584,9 +594,11 @@ sub bot_quote {
     my $quoteid = shift || '';
     
     $quoteid = 0 unless looks_like_number($quoteid);
-    
+    my $rating = 0;
+
     if ($quoteid) { ## get specific quote
-        return output("[$quoteid] ".$quotes->{$quoteid}->{text}) if $quotes->{$quoteid}->{text};
+        $rating = $quotes->{$quoteid}->{rating} if $quotes->{$quoteid}->{rating};
+        return output("[#$quoteid] ".$quotes->{$quoteid}->{text}." ($rating)") if $quotes->{$quoteid}->{text};
         ## if quote doesn't exist:
         return output("Can't find quote #$quoteid");
     }
@@ -599,7 +611,9 @@ sub bot_quote {
     ##check if there are quotes at all:
     return output("No quotes in the database.") unless (@keys);
 
-    return output("[$num] ".$quotes->{$num}->{text});
+    $rating = $quotes->{$num}->{rating} if $quotes->{$num}->{rating};
+
+    return output("[#$num] ".$quotes->{$num}->{text}." ($rating)");
 
 
 }
@@ -642,9 +656,37 @@ sub bot_infquote {
 
     ###my $dt = DateTime->from_epoch( $quotes->{$quoteid}->{date} );
     my $fulldate = scalar gmtime $quotes->{$quoteid}->{date};
-    return output("Quote #$quoteid submitted by ".$quotes->{$quoteid}->{user}." on ".$fulldate) if $quotes->{$quoteid}->{text};
+    return output("Quote #$quoteid submitted by ".$quotes->{$quoteid}->{user}." (on ".$fulldate.") current rating: ".$quotes->{$quoteid}->{rating}) if $quotes->{$quoteid}->{text};
     
 }
+
+sub bot_votequote {
+    my $hostmask = shift || return;
+    my @params = @_;
+    
+    ##missing params
+    return output("USAGE: vote [up|down] [quoteid]") if ($#params < 1);
+    
+    my $vote = 0;
+    $vote = 1 if ($params[0] eq 'up');
+    $vote = -1 if ($params[0] eq 'down');
+
+    if (!looks_like_number($params[1]) || !$vote) {
+        return output("USAGE: vote [up|down] [quoteid]");
+    }
+    
+    ## if quote doesn't exist:
+    return output("Can't find quote #".$params[1]) unless ($quotes->{$params[1]}->{text});
+
+    ##change rating:
+    my $currvote = $quotes->{$params[1]}->{rating};
+    $quotes->{$params[1]}->{rating} = $currvote + $vote;
+    
+    ##save yml:
+    save_yml($quotes,'quotes.yml','db');
+    return output("Quote #".$params[1]." rating updated (".$params[0].")");
+}
+
 
 ### GENERAL COMMANDS ####
 sub bot_slap {
@@ -686,7 +728,6 @@ sub bot_chan_op {
         return output("I would've considered complying, if I had the power.", 'privmsg', 'chan');
     }
 }
-
 
 
 
